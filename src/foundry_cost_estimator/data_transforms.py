@@ -86,7 +86,8 @@ def filter_skus(df: pd.DataFrame) -> pd.DataFrame:
     df_filtered = df.loc[~(
         (df["unitOfMeasure"].str.contains("k", case=False, na=False)) | 
         (df["unitOfMeasure"].str.contains("h", case=False, na=False)) | 
-        (df["unitOfMeasure"] == "1")
+        (df["unitOfMeasure"] == "1") |
+        (df["type"] != "Consumption")
     )]
     return df_filtered
 
