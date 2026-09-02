@@ -28,7 +28,7 @@ def _parse_sku(sku: str) -> dict:
 
     sku_normalized = sku.replace("-", " ").lower().replace("data zone", "data_zone")
     
-    sku_types = {
+    sku_types: dict[str, str|bool|None] = {
         "token_type": None,
         "cached": None,
         "deployment_type": None,
