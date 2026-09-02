@@ -1,0 +1,18 @@
+[project]
+name = "foundry-cost-estimator"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "argparse>=1.4.0",
+    "pandas>=3.0.5",
+    "requests>=2.34.2",
+]
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.411",
+    "pytest>=9.1.1",
+    "ruff>=0.16.5",
+]
