@@ -2,17 +2,21 @@ import requests
 import pandas as pd
 
 
-def get_raw_foundry_prices() -> dict:
-    ms_retail_api = "https://prices.azure.com/api/retail/prices?api-version=2023-01-01-preview"
+def get_raw_foundry_prices() -> list[dict]:
+    url = "https://prices.azure.com/api/retail/prices?api-version=2023-01-01-preview"
+    params = {"$filter": "serviceName eq 'Foundry Models'"}
 
-    response = requests.get(
-        ms_retail_api,
-        params={
-            "$filter": "serviceName eq 'Foundry Models'"
-        }
-    )
-    response.raise_for_status()
+    items = []
 
-    data = response.json()
+    while url:
+        response = requests.get(
+            url,
+            params=params
+        )
+        response.raise_for_status()
+        data = response.json()
+        items.extend(data["Items"])
+        params = None
+        url = data.get("NextPageLink")
 
-    return data["Items"]
+    return items

@@ -1,5 +1,5 @@
 from api_calls import get_raw_foundry_prices
-from data_transforms import apply_transforms, load_raw_to_pd
+from data_transforms import derive_models, apply_sku_transforms, load_raw_to_pd
 import json
 import argparse
 
@@ -19,15 +19,44 @@ def main(reload: bool = False, raw_path: str|None = None):
 
     df = load_raw_to_pd(raw)
 
-    df = apply_transforms(df)
+    df = apply_sku_transforms(df)
 
-    print(df.info())
-    print(df.head())
-    print(df["token_type"].unique())
-    print(df["cached"].unique())
-    print(df["deployment_type"].unique())
-    print(df["processing_type"].unique())
-    print(df["unitOfMeasure_numeric"].unique())
+    # print(df.info())
+    # print(df.head())
+    # print(df["token_type"].unique())
+    # print(df["cached"].unique())
+    # print(df["deployment_type"].unique())
+    # print(df["processing_type"].unique())
+    # print(df["unitOfMeasure_numeric"].unique())
+
+    # checks_df = df#[df["plain_sku_name"] == "5.4 batch"]
+
+    # check1 = checks_df.groupby("plain_sku_name")[
+    #     ["token_type", "cached", "deployment_type", "processing_type"]
+    # ].nunique()
+
+    # check2 = checks_df.groupby("plain_sku_name")[
+    #     ["token_type", "cached", "deployment_type", "processing_type"]
+    # ].apply(lambda x: x.drop_duplicates())
+
+    # check3 = checks_df.groupby("plain_sku_name").agg(
+    #     token_types=("token_type", "unique"),
+    #     cached=("cached", "unique"),
+    #     deployment_types=("deployment_type", "unique"),
+    #     processing_types=("processing_type", "unique"),
+    # )
+
+    # print(check1)
+    # print(check2)
+    # print(check3)
+
+    models_df = derive_models(df)
+
+    print(models_df.info())
+    print(models_df.head())
+
+    print(models_df[models_df["input_sku"].isna()])
+    print(models_df[(models_df["input_sku"].isna())&(models_df["input_cached_sku"].isna())])
 
 
 if __name__ == "__main__":
