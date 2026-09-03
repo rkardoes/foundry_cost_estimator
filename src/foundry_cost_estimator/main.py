@@ -27,6 +27,7 @@ def main(reload: bool = False, raw_path: str|None = None):
     print(df["cached"].unique())
     print(df["deployment_type"].unique())
     print(df["processing_type"].unique())
+    print(df["unitOfMeasure_numeric"].unique())
 
 
 if __name__ == "__main__":

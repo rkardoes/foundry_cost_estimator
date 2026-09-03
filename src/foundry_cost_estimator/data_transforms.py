@@ -75,6 +75,22 @@ def _parse_sku(sku: str) -> dict:
 
     return sku_types
 
+def _parse_unitOfMeasure(uom: str) -> int|None:
+    if "1M" in uom:
+        return 1_000_000
+    if "1K" in uom:
+        return 1_000
+    else: 
+        try:
+            to_int = int(uom)
+            return to_int
+        except:
+            return None
+
+def get_unitOfmeasure_column(df: pd.DataFrame) -> pd.DataFrame:
+    df["unitOfMeasure_numeric"] = df["unitOfMeasure"].apply(_parse_unitOfMeasure)
+    print(df["unitOfMeasure_numeric"].unique())
+    return df
 
 def get_sku_type_columns(df: pd.DataFrame) -> pd.DataFrame:
     parsed = df["skuName"].apply(_parse_sku).apply(pd.Series)
@@ -84,7 +100,7 @@ def get_sku_type_columns(df: pd.DataFrame) -> pd.DataFrame:
 
 def filter_skus(df: pd.DataFrame) -> pd.DataFrame:
     df_filtered = df.loc[~(
-        (df["unitOfMeasure"].str.contains("k", case=False, na=False)) | 
+        #(df["unitOfMeasure"].str.contains("k", case=False, na=False)) | 
         (df["unitOfMeasure"].str.contains("h", case=False, na=False)) | 
         (df["unitOfMeasure"] == "1") |
         (df["type"] != "Consumption")
@@ -92,4 +108,4 @@ def filter_skus(df: pd.DataFrame) -> pd.DataFrame:
     return df_filtered
 
 def apply_transforms(df: pd.DataFrame) -> pd.DataFrame:
-    return get_sku_type_columns(filter_skus(df))
+    return get_sku_type_columns(get_unitOfmeasure_column(filter_skus(df)))
