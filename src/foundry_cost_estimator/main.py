@@ -2,34 +2,31 @@ from api_calls import get_raw_foundry_prices
 from data_transforms import derive_models, apply_sku_transforms, load_raw_to_pd
 from database import DB
 from datetime import date
+from pathlib import Path
 import json
 import argparse
 
 
 # I know this is messy please I just need this to work lol
-def get_raw_data(raw_path) -> dict:
+def get_raw_data(raw_path) -> list[dict]:
     try:
         with open(raw_path, "r") as file:
             raw = json.load(file)
             print("got raw data")
         return raw
-    except:
+    except FileNotFoundError:
         print("couldn't find json file to load from, calling api")
         data = get_raw_foundry_prices()
+        print("ensuring data/response exists")
+        path = Path(raw_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
         with open(raw_path, "w", encoding="utf-8") as file:
             json.dump(data, file, indent=4)
-        try:
-            with open(raw_path, "r") as file:
-                raw = json.load(file)
-            print("got raw data")
-            return raw
-        except:
-            print("FATAL: ISSUE WITH FILE PATH (cannot load json)")
-            raise
+        return data
+    except:
+        raise
 
 def main(reload: bool = False,  wipe_db: bool = False, raw_path: str|None = None):
-
-    db = DB("data/foundry_prices.db")
 
     if raw_path is None:
         raw_path = f"data/response/{date.today()}.json"
@@ -45,7 +42,7 @@ def main(reload: bool = False,  wipe_db: bool = False, raw_path: str|None = None
 
     df = apply_sku_transforms(df)
 
-    print("deriving models dataframe")
+    print("deriving models dataframe\n")
     models_df = derive_models(df)
 
     print("====================================== DATAFRAME INFO ======================================")
@@ -54,6 +51,8 @@ def main(reload: bool = False,  wipe_db: bool = False, raw_path: str|None = None
     print(models_df.info())
     print(models_df.head())
     print("============================================================================================")
+
+    db = DB("data/foundry_prices.db")
 
     if wipe_db:
         print("dropping all tables (wipe_db = True)")

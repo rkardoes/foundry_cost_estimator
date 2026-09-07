@@ -1,6 +1,6 @@
 import pandas as pd
 
-def load_raw_to_pd(raw: dict):
+def load_raw_to_pd(raw: list[dict]):
     df = pd.DataFrame(raw)
     return df
 
