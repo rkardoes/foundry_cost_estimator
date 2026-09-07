@@ -207,7 +207,8 @@ def derive_models(df: pd.DataFrame) -> pd.DataFrame:
             continue
 
         models.append(model)
-
+    #newline from loading bar
+    print("\n")
         
     model_df = pd.DataFrame(models)
     return model_df

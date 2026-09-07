@@ -4,6 +4,26 @@ import json
 import argparse
 from database import DB
 
+# I know this is messy please I just need this to work lol
+def get_raw_data(raw_path) -> dict:
+    try:
+        with open(raw_path, "r") as file:
+            raw = json.load(file)
+            print("got raw data")
+        return raw
+    except:
+        print("couldn't find json file to load from, calling api")
+        data = get_raw_foundry_prices()
+        with open(raw_path, "w", encoding="utf-8") as file:
+            json.dump(data, file, indent=4)
+        try:
+            with open(raw_path, "r") as file:
+                raw = json.load(file)
+            print("got raw data")
+            return raw
+        except:
+            print("FATAL: ISSUE WITH FILE PATH (cannot load json)")
+            raise
 
 def main(reload: bool = False,  wipe_db: bool = False, raw_path: str|None = None):
 
@@ -17,9 +37,7 @@ def main(reload: bool = False,  wipe_db: bool = False, raw_path: str|None = None
         with open(raw_path, "w", encoding="utf-8") as file:
             json.dump(data, file, indent=4)
 
-
-    with open(raw_path, "r") as file:
-        raw = json.load(file)
+    raw = get_raw_data(raw_path)
 
     df = load_raw_to_pd(raw)
 
