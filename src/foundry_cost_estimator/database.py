@@ -1,4 +1,6 @@
 import sqlite3
+import pandas as pd
+from datetime import datetime, timezone
 
 class DB():
     def __init__(self, path: str):
@@ -17,30 +19,36 @@ class DB():
                 cached_token INTEGER,
                 deployment_type TEXT,
                 processing_type TEXT
-            )
+            );
         """)
 
         self.connection.execute("""
             CREATE TABLE IF NOT EXISTS prices (
-                price_version_pk INTEGER PRIMARY KEY,
+                price_version_pk INTEGER PRIMARY KEY AUTOINCREMENT,
                 sku_id TEXT NOT NULL,
                 retail_price REAL NOT NULL,
                 unit_price REAL NOT NULL,
                 unit_of_measure TEXT NOT NULL,
                 unit_of_measure_num INTEGER,
-                effectiveStartDate TEXT NOT NULL,
-                effectiveEndDate TEXT NOT NULL,
+                effective_start_date TEXT NOT NULL,
                 observed_from TEXT NOT NULL,
                 observed_to TEXT,
-                is_current INTEGER,
+                is_current INTEGER NOT NULL DEFAULT 0,
 
-                FOREIGN KEY (sku_id) REFERENCE skus(sku_id)
-            )
+                FOREIGN KEY (sku_id) REFERENCES skus(sku_id),
+                UNIQUE (sku_id, retail_price, unit_price, unit_of_measure, effective_start_date)
+            );
+        """)
+
+        self.connection.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_prices_one_current_sku
+            ON prices (sku_id)
+            WHERE is_current = 1;
         """)
 
         self.connection.execute("""
             CREATE TABLE IF NOT EXISTS models (
-                model_version_pk INTEGER PRIMARY KEY,
+                model_pk INTEGER PRIMARY KEY AUTOINCREMENT,
                 model_name TEXT NOT NULL,
                 deployment_type TEXT NOT NULL,
                 processing_type TEXT NOT NULL,
@@ -50,10 +58,160 @@ class DB():
                 input_cached_sku TEXT,
                 output_cached_sku TEXT,
 
-                FOREIGN KEY(input_sku) REFERENCE skus(sku_id),
-                FOREIGN KEY(output_sku) REFERENCE skus(sku_id),
-                FOREIGN KEY(input_cached_sku) REFERENCE skus(sku_id),
-                FOREIGN KEY(output_cached_sku) REFERENCE skus(sku_id)
-            )
+                FOREIGN KEY(input_sku) REFERENCES skus(sku_id),
+                FOREIGN KEY(output_sku) REFERENCES skus(sku_id),
+                FOREIGN KEY(input_cached_sku) REFERENCES skus(sku_id),
+                FOREIGN KEY(output_cached_sku) REFERENCES skus(sku_id),
+
+                UNIQUE(model_name, deployment_type, processing_type, location)
+            );
         """)
 
+    def _drop_all_tables(self) -> None:
+
+        self.connection.execute("PRAGMA foreign_keys = OFF")
+
+        tables = self.connection.execute("""
+            SELECT name
+            FROM sqlite_master
+            WHERE type = 'table'
+            AND name NOT LIKE 'sqlite_%';
+        """).fetchall()
+
+        for (table,) in tables:
+            self.connection.execute(f"DROP TABLE {table}")
+            self.connection.commit()
+
+        self.connection.execute("PRAGMA foreign_keys = ON")
+        
+    def _upsert(self, table: str, data: pd.DataFrame, column_map: dict[str, str], db_key_columns: list[str]) -> None:
+        insert_columns = []
+
+        for key in column_map.keys():
+            insert_columns.append(column_map[key])
+
+        q_marks = ["?" for _ in insert_columns]
+
+        excluded = [f"{col} = excluded.{col}" for col in insert_columns 
+                    if col not in db_key_columns]
+
+        query = f"""
+            INSERT INTO {table} ({",\n".join(insert_columns)}) VALUES ({", ".join(q_marks)})
+            ON CONFLICT ({", ".join(db_key_columns)})
+            DO UPDATE SET
+            {",\n".join(excluded)}
+            ;
+        """
+
+        cursor = self.connection.cursor()
+
+        try:
+            cursor.executemany(
+                query,
+                data[column_map.keys()].itertuples(index=False, name=None)
+            )
+
+            self.connection.commit()
+
+        except sqlite3.DatabaseError:
+            self.connection.rollback()
+            raise
+
+    def upsert_skus(self, data: pd.DataFrame) -> None:
+        column_map = {
+            "skuId": "sku_id",
+            "skuName": "sku_name_full",
+            "plain_sku_name": "sku_name",
+            "armSkuName": "arm_sku_name",
+            "productName": "product_name",
+            "location": "location",
+            "token_type": "token_type",
+            "cached": "cached_token",
+            "deployment_type": "deployment_type",
+            "processing_type": "processing_type"
+        }
+
+        key_columns = ["sku_id"]
+
+        table = "skus"
+
+        self._upsert(table, data, column_map, key_columns)
+
+    def upsert_models(self, data: pd.DataFrame) -> None:
+
+        table = "models"
+
+        column_map = {
+            "name": "model_name",
+            "deployment_type": "deployment_type",
+            "processing_type": "processing_type",
+            "location": "location",
+            "input_sku": "input_sku",
+            "output_sku": "output_sku",
+            "input_cached_sku": "input_cached_sku",
+            "output_cached_sku": "output_cached_sku",
+        }
+
+        key_columns = ["model_name", "deployment_type", "processing_type", "location"]
+
+        self._upsert(table, data, column_map, key_columns)
+
+    def upsert_prices(self, data: pd.DataFrame) -> None:
+
+        table = "prices"
+
+        column_map = {
+            "skuId": "sku_id",
+            "retailPrice": "retail_price",
+            "unitPrice": "unit_price",
+            "unitOfMeasure": "unit_of_measure",
+            "unitOfMeasure_numeric": "unit_of_measure_num",
+            "effectiveStartDate": "effective_start_date",
+            "observed_from": "observed_from",
+            "observed_to": "observed_to",
+            "is_current": "is_current"
+        }
+
+        key_columns = ["sku_id", "retail_price", "unit_price", "unit_of_measure", "effective_start_date"]
+
+        observed_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        current_prices = set(self.connection.execute("""
+            SELECT sku_id, retail_price, unit_price, unit_of_measure
+            FROM prices
+            WHERE is_current = 1 
+        """))
+
+        incoming_prices = set(
+            data[["skuId", "retailPrice", "unitPrice", "unitOfMeasure"]].itertuples(index=False, name=None)
+        )
+
+        # get set of new price ids, id is at index = 0 for the resulting set of tuples
+        new_price_ids = {x[0] for x in (incoming_prices - current_prices)}
+        updated_records = 0
+        for id in new_price_ids:
+            cursor = self.connection.execute("SELECT * FROM prices WHERE is_current = 1 AND sku_id = ?", (id,))
+            old = cursor.fetchone()
+            if old is not None:
+                self.connection.execute("""
+                UPDATE prices SET 
+                observed_to = ?,
+                is_current = 0 
+                WHERE is_current = 1 
+                AND sku_id = ?
+                """, 
+                (observed_at, id,)
+                )
+
+                updated_records += 1
+
+        self.connection.commit()
+
+        print(f"SCD 2: Updated {updated_records} records")
+
+        new_sku_df = data[data["skuId"].isin(new_price_ids)].copy()
+        new_sku_df["is_current"] = 1
+        new_sku_df["observed_from"] = observed_at
+        new_sku_df["observed_to"] = None
+
+        self._upsert(table, new_sku_df, column_map, key_columns)

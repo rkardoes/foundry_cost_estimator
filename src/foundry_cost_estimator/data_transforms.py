@@ -132,9 +132,23 @@ def filter_unkowns(df: pd.DataFrame) -> pd.DataFrame:
 
 def apply_sku_transforms(df: pd.DataFrame) -> pd.DataFrame:
     """applies all transformations necessary to parse out the sku table"""
+    print("applying sku transforms")
+    print("filtering")
     df_return = filter_skus(df)
+    print("getting numeric unitOfMeasure")
     df_return = get_unitOfmeasure_column(df_return)
+    print("getting additional columns")
     df_return = get_sku_type_columns(df_return)
+
+    print("spiffing up GPT names")
+    gpt_mask = (
+        df_return["plain_sku_name"].str.fullmatch(r"\d+\.\d+", na=False) &
+        df_return["productName"].str.startswith("Azure OpenAI", na=False)
+    )
+    # adds "GPT"to plain sku name
+    df_return.loc[gpt_mask, "plain_sku_name"] = "gpt " + df_return.loc[gpt_mask, "plain_sku_name"]
+
+    print("final filter of unknown values")
     df_return = filter_unkowns(df_return)
 
     return df_return
@@ -148,55 +162,52 @@ def _test_sku_validity(sku: pd.Series) -> tuple[str|None, bool]:
         return_sku = sku.iloc[0]
         return return_sku, True
 
-def _test_model_validity(model: str, deployment: str, location: str, processing: str, skus: pd.DataFrame) -> dict|None:
-    """
-    Ensures that a model name, deployment, location, and processing type combo have only 1 input and output
-    sku's attached, or 0. This will probably require a little bit of data cleaning down the road.
-    """
-    rel_skus = skus[
-        (skus["plain_sku_name"] == model)&
-        (skus["deployment_type"] == deployment)&
-        (skus["location"] == location)&
-        (skus["processing_type"] == processing)
-        ]
-    input_sku_cndts = rel_skus.loc[(rel_skus["token_type"]=="input")&(rel_skus["cached"]==False)]["skuId"]
-    output_sku_cndts = rel_skus.loc[(rel_skus["token_type"]=="output")&(rel_skus["cached"]==False)]["skuId"]
-    input_cached_sku_cndts = rel_skus.loc[(rel_skus["token_type"]=="input")&(rel_skus["cached"]==True)]["skuId"]
-    output_cached_sku_cndts = rel_skus.loc[(rel_skus["token_type"]=="output")&(rel_skus["cached"]==True)]["skuId"]
-
-    sku_column_cndts: dict[str, pd.Series] = {
-        "input_sku": input_sku_cndts,
-        "output_sku": output_sku_cndts,
-        "input_cached_sku": input_cached_sku_cndts,
-        "output_cached_sku": output_cached_sku_cndts,
-    }
-
-    sku_columns = {}
-
-    for key in sku_column_cndts.keys():
-        sku_id, valid = _test_sku_validity(sku_column_cndts[key])
-        if not valid:
-            return None
-        sku_columns[key] = sku_id
-
-    return sku_columns
-
-
 def derive_models(df: pd.DataFrame) -> pd.DataFrame:
-    model_cdnts = list(
-        df[["plain_sku_name", "deployment_type", "location", "processing_type"]]
-        .drop_duplicates()
-        .itertuples(index=False, name=None)
-        )
+   
     models = []
-    for mc in model_cdnts:
-        model = _test_model_validity(mc[0], mc[1], mc[2], mc[3], df)
-        if model is not None:
-            model["name"] = mc[0]
-            model["deployment_type"] = mc[1]
-            model["location"] = mc[2]
-            model["processing_type"] = mc[3]
-            models.append(model)
 
-    model_df = pd.DataFrame(models)    
+    grouped_df = df.groupby(["plain_sku_name", "deployment_type", "location", "processing_type"])
+
+    print(f"found {len(grouped_df)} model candidates")
+    for i, (key, group) in enumerate(grouped_df, start=1):
+        # literally all for a loading bar
+        perc_complete = i/len(grouped_df)
+        num_complete = int(perc_complete*10)
+        num_not = 10-num_complete
+        bar_complete = "█" * num_complete
+        bar_incomplete= "░" * num_not
+        bar = bar_complete + bar_incomplete
+        print(f"\r[{bar}] {perc_complete*100:.0f}% complete", end="", flush=True)
+
+        # test skus to see if they are valid for the models
+        skip = False
+        model = {}
+        model["name"] = key[0]
+        model["name"] = key[0]
+        model["deployment_type"] = key[1]
+        model["location"] = key[2]
+        model["processing_type"] = key[3]
+        model["input_sku"] = group.loc[(group["token_type"] == "input") & (~group["cached"]), "skuId"]
+        model["output_sku"] = group.loc[(group["token_type"] == "output") & (~group["cached"]), "skuId"]
+        model["input_cached_sku"] = group.loc[(group["token_type"] == "input") & (group["cached"]), "skuId"]
+        model["output_cached_sku"] = group.loc[(group["token_type"] == "output") & (group["cached"]), "skuId"]
+
+        for sku in [
+             "input_sku",
+             "output_sku",
+             "input_cached_sku",
+             "output_cached_sku",
+        ]:
+                sku_id, valid = _test_sku_validity(model[sku])
+                if not valid:
+                    skip = True
+                model[sku] = sku_id
+
+        if skip:
+            continue
+
+        models.append(model)
+
+        
+    model_df = pd.DataFrame(models)
     return model_df
