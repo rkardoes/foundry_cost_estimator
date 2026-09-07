@@ -232,7 +232,7 @@ class DB():
         ).fetchone()
         return ppt
 
-    def query_model_skus(self, model_name:str, location:str, deployment_type:str, processing_type:str) -> dict:
+    def query_model_sku_prices(self, model_name:str, location:str, deployment_type:str, processing_type:str) -> dict:
         query = """
             SELECT
                 input_sku,
@@ -263,4 +263,22 @@ class DB():
             prices[sku] = self._query_sku_price(id) if id is not None else None
         return prices
 
-    
+    def query_locations(self) -> list:
+        lst: list[tuple] = self.connection.execute("SELECT DISTINCT location FROM models;").fetchall()
+        rtrn_list = [x[0] for x in lst]
+        return rtrn_list
+
+    def query_deployment_type(self, location: str) -> list:
+        lst: list[tuple] = self.connection.execute("SELECT DISTINCT deployment_type FROM models WHERE location = ?;", (location,)).fetchall()
+        rtrn_list = [x[0] for x in lst]
+        return sorted(rtrn_list)
+
+    def query_processing_type(self, location: str, deployment_type: str) -> list:
+        lst: list[tuple] = self.connection.execute("SELECT DISTINCT processing_type FROM models WHERE location = ? AND deployment_type = ?;", (location, deployment_type,)).fetchall()
+        rtrn_list = [x[0] for x in lst]
+        return sorted(rtrn_list)
+
+    def query_models_filtered(self, location: str, deployment_type: str, processing_type: str) -> list:
+        lst: list[tuple] = self.connection.execute("SELECT DISTINCT model_name FROM models WHERE location = ? AND deployment_type = ? AND processing_type = ?", (location, deployment_type, processing_type,)).fetchall()
+        rtrn_list = [x[0] for x in lst]
+        return sorted(rtrn_list)
