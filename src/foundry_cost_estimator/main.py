@@ -1,8 +1,10 @@
 from api_calls import get_raw_foundry_prices
 from data_transforms import derive_models, apply_sku_transforms, load_raw_to_pd
+from database import DB
+from datetime import date
 import json
 import argparse
-from database import DB
+
 
 # I know this is messy please I just need this to work lol
 def get_raw_data(raw_path) -> dict:
@@ -30,7 +32,7 @@ def main(reload: bool = False,  wipe_db: bool = False, raw_path: str|None = None
     db = DB("data/foundry_prices.db")
 
     if raw_path is None:
-        raw_path = "data/raw_response.json"
+        raw_path = f"data/response/{date.today()}.json"
     if reload:
         print("reloading data from api call")
         data = get_raw_foundry_prices()
