@@ -215,3 +215,52 @@ class DB():
         new_sku_df["observed_to"] = None
 
         self._upsert(table, new_sku_df, column_map, key_columns)
+
+
+    def _query_sku_price(self, sku:str) -> float:
+        query = """
+            SELECT
+                (unit_price/unit_of_measure_num) as ppt
+            FROM
+                prices
+            WHERE
+                sku_id = ?
+        """
+        ppt = self.connection.execute(
+            query,
+            (sku,)
+        ).fetchone()
+        return ppt
+
+    def query_model_skus(self, model_name:str, location:str, deployment_type:str, processing_type:str) -> dict:
+        query = """
+            SELECT
+                input_sku,
+                output_sku,
+                input_cached_sku,
+                output_cached_sku
+            FROM 
+                models
+            WHERE 
+                model_name = ? AND
+                location = ? AND
+                deployment_type = ? AND
+                processing_type = ?
+            ;
+        """
+        skus = self.connection.execute(
+            query,
+            (model_name, location, deployment_type, processing_type)
+        ).fetchone()
+        sku_ids = {
+            "input": skus[0],
+            "output": skus[1],
+            "input_cached": skus[2],
+            "output_cached": skus[3]
+        }
+        prices = {}
+        for (sku, id) in sku_ids.items():
+            prices[sku] = self._query_sku_price(id) if id is not None else None
+        return prices
+
+    
