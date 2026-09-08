@@ -54,6 +54,7 @@ def main(reload: bool = False, call_api: bool = False, wipe_db: bool = False, ra
         data = get_raw_foundry_prices()
         with open(raw_path, "w", encoding="utf-8") as file:
             json.dump(data, file, indent=4)
+        reload = True
 
     if reload:
 
