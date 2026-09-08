@@ -229,7 +229,7 @@ class DB():
         ppt = self.connection.execute(
             query,
             (sku,)
-        ).fetchone()
+        ).fetchone()[0]
         return ppt
 
     def query_model_sku_prices(self, model_name:str, location:str, deployment_type:str, processing_type:str) -> dict:
@@ -261,6 +261,13 @@ class DB():
         prices = {}
         for (sku, id) in sku_ids.items():
             prices[sku] = self._query_sku_price(id) if id is not None else None
+        model = {
+            "name": model_name,
+            "location": location,
+            "deployment_type": deployment_type,
+            "processing_type": processing_type
+        }
+        prices["model"] = model
         return prices
 
     def query_locations(self) -> list:

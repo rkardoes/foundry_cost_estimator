@@ -1,11 +1,12 @@
 from api_calls import get_raw_foundry_prices
 from data_transforms import derive_models, apply_sku_transforms, load_raw_to_pd
+from token_estimator import Estimator
 from database import DB
+from helpers import _list_selector
 from datetime import date
 from pathlib import Path
 import json
 import argparse
-
 
 # I know this is messy please I just need this to work lol
 def get_raw_data(raw_path) -> list[dict]:
@@ -26,71 +27,24 @@ def get_raw_data(raw_path) -> list[dict]:
     except:
         raise
 
+
 def lookup_loop(db: DB):
     locations = db.query_locations()
-    for i, loc in enumerate(locations, start=1):
-        print(f"{i}. {loc}")
-    tryer = True
-    while tryer:
-        try:
-            location = locations[int(input("\ntype number to select location\n"))-1]
-            tryer = False
-            print("\n")
-        except KeyboardInterrupt:
-            print("\n")
-            exit()
-        except:
-            print("invalid select, try again or press ctr+C to force quit program\n")
+    location = _list_selector("type number to select location", locations)
 
     deployments = db.query_deployment_type(location)
-    for i, dep in enumerate(deployments, start=1):
-        print(f"{i}. {dep}")
-    tryer = True
-    while tryer:
-        try:
-            deployment = deployments[int(input("\ntype number to select deployment type\n"))-1]
-            tryer = False
-            print("\n")
-        except KeyboardInterrupt:
-            print("\n")
-            exit()
-        except:
-            print("invalid select, try again or press ctr+C to force quit program\n")
+    deployment = _list_selector("type number to select deployment type", deployments)
 
     processes = db.query_processing_type(location, deployment)
-    for i, proc in enumerate(processes, start=1):
-        print(f"{i}. {proc}")
-    tryer = True
-    while tryer:
-        try:
-            process = processes[int(input("\ntype number to select process type\n"))-1]
-            tryer = False
-            print("\n")
-        except KeyboardInterrupt:
-            print("\n")
-            exit()
-        except:
-            print("invalid select, try again or press ctr+C to force quit program\n")
+    process = _list_selector("type number to select processing type", processes)
 
     models = db.query_models_filtered(location, deployment, process)
-    for i, mod in enumerate(models, start=1):
-        print(f"{i}. {mod}")
-    tryer = True
-    while tryer:
-        try:
-            model = models[int(input("\ntype number to select model\n"))-1]
-            tryer = False
-            print("\n")
-        except KeyboardInterrupt:
-            print("\n")
-            exit()
-        except:
-            print("invalid select, try again or press ctr+C to force quit program\n")
+    model = _list_selector("type number to select model", models)
 
     prices = db.query_model_sku_prices(model, location, deployment, process)
 
-    print(prices)
-    print("\n\n\n")
+    est = Estimator(prices)
+    print(est.report)
 
 def main(reload: bool = False, call_api: bool = False, wipe_db: bool = False, raw_path: str|None = None):
     if raw_path is None:
@@ -145,6 +99,9 @@ def main(reload: bool = False, call_api: bool = False, wipe_db: bool = False, ra
 
     while True:
         lookup_loop(db)
+        choice = input("\nget another estimate? (y,n)\n")
+        if choice == "n":
+            exit()
     
 
 
