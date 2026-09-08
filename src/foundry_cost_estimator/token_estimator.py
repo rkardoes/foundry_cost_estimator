@@ -130,9 +130,9 @@ processing type: {self.processing}
 """
         table = [
             f"     {"LOW":^10} | {"MID":^10} | {"HIGH":^10}",
-            f"Day: {self.day_low:>10} | {self.day_mid:>10} | {self.day_high}",
-            f" Wk: {self.wk_low:>10} | {self.wk_mid:>10} | {self.wk_high}",
-            f" Mo: {self.mo_low:>10} | {self.mo_mid:>10} | {self.mo_high}",
+            f"Day: {self.day_low:>10} | {self.day_mid:>10} | {self.day_high:>10}",
+            f" Wk: {self.wk_low:>10} | {self.wk_mid:>10} | {self.wk_high:>10}",
+            f" Mo: {self.mo_low:>10} | {self.mo_mid:>10} | {self.mo_high:>10}",
         ]
 
         table_complete = "\n".join(table)
