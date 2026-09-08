@@ -47,14 +47,9 @@ def lookup_loop(db: DB):
     print(est.report)
 
 def main(reload: bool = False, call_api: bool = False, wipe_db: bool = False, raw_path: str|None = None):
+
     if raw_path is None:
         raw_path = f"data/response/{date.today()}.json"
-    if call_api:
-        print("reloading data from api call")
-        data = get_raw_foundry_prices()
-        with open(raw_path, "w", encoding="utf-8") as file:
-            json.dump(data, file, indent=4)
-        reload = True
 
     if reload:
 
@@ -109,9 +104,8 @@ def main(reload: bool = False, call_api: bool = False, wipe_db: bool = False, ra
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--reload", type=bool)
-    parser.add_argument("--call_api", type=bool)
     parser.add_argument("--raw_path", type=str)
-    parser.add_argument("--wipe_db", type = bool)
+    parser.add_argument("--wipe_db", type=bool)
     args = parser.parse_args()
     main(args.reload, args.wipe_db, args.raw_path) 
 

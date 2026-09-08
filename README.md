@@ -11,24 +11,24 @@ uv sync
 
 To use for the first time, run **from the repo root**:
 ```
-uv run foundry_cost_estimator/main.py --call-api True
+uv run foundry_cost_estimator/main.py --reload True --wipe_db True
 ```
 
 ## General Usage
 
 To run, **from repo root**:
 ```
-uv run foundry_cost_estimator/main.py
+uv run src/foundry_cost_estimator/main.py
 ```
 
 To reload from stored json:
 ```
-uv run foundry_cost_estimator/main.py --reload True --raw-path data/response/<date>.json
+uv run src/foundry_cost_estimator/main.py --reload True --raw-path data/response/<date>.json
 ```
 
 To run and wipe the db:
 ```
-uv run foundry_cost_estimator/main.py --wipe-db True
+uv run src/foundry_cost_estimator/main.py --wipe-db True
 ```
 
 
